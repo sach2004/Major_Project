@@ -1,0 +1,255 @@
+// AI Software Archaeologist — database schema
+// Mirrors the ER design: Repository, AnalysisJob, UserQuery, File, Developer,
+// Commit, CommitFile, CodeEntity, CodeChunk, Embedding — plus GraphEdge
+// (knowledge-graph relationships), Document, ImpactAnalysis and Setting.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id             String    @id @default(uuid())
+  name           String
+  url            String
+  isLocal        Boolean   @default(false)
+  branch         String?
+  localPath      String?
+  headSha        String?
+  status         String    @default("pending") // pending | analyzing | ready | error
+  error          String?
+  syncEnabled    Boolean   @default(true)
+  lastSyncedAt   DateTime?
+  lastAnalyzedAt DateTime?
+  summary        String?
+  stats          String? // JSON
+  packages       String? // JSON [{name,count}]
+  embeddingModel String?
+  contentHash    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  jobs       AnalysisJob[]
+  queries    UserQuery[]
+  files      File[]
+  commits    Commit[]
+  developers Developer[]
+  entities   CodeEntity[]
+  chunks     CodeChunk[]
+  embeddings Embedding[]
+  edges      GraphEdge[]
+  documents  Document[]
+  impacts    ImpactAnalysis[]
+}
+
+model AnalysisJob {
+  id          String    @id @default(uuid())
+  repoId      String
+  type        String // analyze | sync
+  trigger     String    @default("manual") // manual | cron | initial
+  status      String    @default("queued") // queued | running | completed | failed | skipped
+  stage       String?
+  progress    Int       @default(0)
+  message     String?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  repo        Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, createdAt])
+}
+
+model UserQuery {
+  id        String   @id @default(uuid())
+  repoId    String
+  question  String
+  answer    String?
+  sources   String? // JSON
+  provider  String?
+  createdAt DateTime @default(now())
+  repo      Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, createdAt])
+}
+
+model File {
+  id           String    @id @default(uuid())
+  repoId       String
+  key          String
+  path         String
+  language     String
+  loc          Int       @default(0)
+  size         Int       @default(0)
+  hash         String
+  fanIn        Int       @default(0)
+  fanOut       Int       @default(0)
+  churn        Int       @default(0)
+  commitCount  Int       @default(0)
+  authors      Int       @default(0)
+  lastModified DateTime?
+  externalDeps String? // JSON string[]
+  summary      String?
+  repo         Repository   @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  entities     CodeEntity[]
+  chunks       CodeChunk[]
+
+  @@unique([repoId, path])
+  @@index([repoId, key])
+}
+
+model Developer {
+  id      String   @id @default(uuid())
+  repoId  String
+  name    String
+  email   String
+  repo    Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  commits Commit[]
+
+  @@unique([repoId, email])
+}
+
+model Commit {
+  id           String   @id @default(uuid())
+  repoId       String
+  sha          String
+  developerId  String?
+  message      String
+  committedAt  DateTime
+  additions    Int      @default(0)
+  deletions    Int      @default(0)
+  filesChanged Int      @default(0)
+  repo         Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  developer    Developer? @relation(fields: [developerId], references: [id], onDelete: SetNull)
+  files        CommitFile[]
+
+  @@unique([repoId, sha])
+  @@index([repoId, committedAt])
+}
+
+model CommitFile {
+  id         String @id @default(uuid())
+  repoId     String
+  commitId   String
+  path       String
+  changeType String
+  additions  Int    @default(0)
+  deletions  Int    @default(0)
+  commit     Commit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+
+  @@index([commitId])
+  @@index([repoId, path])
+}
+
+model CodeEntity {
+  id            String   @id @default(uuid())
+  repoId        String
+  fileId        String
+  key           String
+  name          String
+  qualifiedName String
+  type          String
+  startLine     Int
+  endLine       Int
+  signature     String?
+  parentKey     String?
+  exported      Boolean  @default(true)
+  fanIn         Int      @default(0)
+  fanOut        Int      @default(0)
+  summary       String?
+  repo          Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  file          File       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  chunks        CodeChunk[]
+
+  @@index([repoId, key])
+  @@index([repoId, name])
+  @@index([fileId])
+}
+
+model CodeChunk {
+  id         String   @id @default(uuid())
+  repoId     String
+  fileId     String
+  entityId   String?
+  content    String
+  chunkIndex Int
+  startLine  Int
+  endLine    Int
+  hash       String
+  repo       Repository  @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  file       File        @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  entity     CodeEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+  embedding  Embedding?
+
+  @@index([repoId])
+  @@index([fileId])
+}
+
+model Embedding {
+  id      String   @id @default(uuid())
+  repoId  String
+  chunkId String   @unique
+  model   String
+  dims    Int
+  hash    String
+  vector  Bytes
+  repo    Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  chunk   CodeChunk  @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, model])
+}
+
+model GraphEdge {
+  id     String @id @default(uuid())
+  repoId String
+  source String
+  target String
+  type   String // CONTAINS | IMPORTS | CALLS | EXTENDS | CO_CHANGED
+  weight Float  @default(1)
+  repo   Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, type])
+  @@index([repoId, source])
+  @@index([repoId, target])
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  repoId    String
+  kind      String // overview | module | dependencies | insights
+  slug      String
+  title     String
+  content   String
+  provider  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  repo      Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, slug])
+}
+
+model ImpactAnalysis {
+  id          String   @id @default(uuid())
+  repoId      String
+  targets     String // JSON
+  description String?
+  riskScore   Int
+  result      String // JSON
+  explanation String?
+  provider    String?
+  inputHash   String?
+  createdAt   DateTime @default(now())
+  repo        Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId, createdAt])
+  @@index([repoId, inputHash])
+}
+
+model Setting {
+  key   String @id
+  value String
+}

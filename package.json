@@ -1,0 +1,45 @@
+{
+  "name": "ai-software-archaeologist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Software Archaeologist — intelligent code understanding and change analysis",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "predev": "node scripts/setup.mjs --quiet",
+    "dev": "next dev",
+    "prebuild": "node scripts/setup.mjs --quiet",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "node scripts/setup.mjs",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma db push --force-reset --skip-generate"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "@google/genai": "^1.15.0",
+    "@prisma/client": "~6.16.0",
+    "framer-motion": "^12.23.0",
+    "lucide-react": "^0.469.0",
+    "mermaid": "^11.4.1",
+    "next": "~15.5.0",
+    "openai": "^5.10.0",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-force-graph-2d": "^1.25.5",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "postcss": "^8.5.0",
+    "prisma": "~6.16.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0"
+  }
+}
