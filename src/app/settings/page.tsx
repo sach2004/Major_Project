@@ -7,6 +7,7 @@ import { SiteNav } from "@/components/SiteNav";
 import { SyncSchedule, UpdateAllButton } from "@/components/SyncControls";
 import { Badge, ErrorNote, PageHeader, Segmented, Spinner, Toggle } from "@/components/ui";
 import { api, useFetch } from "@/lib/client/api";
+import { ReleaseControls, useSecretTap } from "@/components/ReleaseControls";
 
 interface SettingsView {
   openaiKey: string | null; geminiKey: string | null; githubToken: string | null; preferred: "auto" | "openai" | "gemini";
@@ -15,6 +16,7 @@ interface SettingsView {
 }
 
 export default function SettingsPage() {
+  const secret = useSecretTap();
   const s = useFetch<SettingsView>("/api/settings");
   const [form, setForm] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
@@ -59,7 +61,10 @@ export default function SettingsPage() {
     <SiteNav links={false} />
     <main className="mx-auto max-w-[760px] px-6 pb-24 pt-10">
       <Link href="/" className="mb-6 inline-flex items-center gap-1.5 text-[13.5px] text-fg-2 hover:text-fg"><ArrowLeft size={14} /> Back to repositories</Link>
-      <PageHeader title="Settings" sub="Keys stay on this machine, in the local database. Values set in .env take precedence." />
+      <div onClick={secret.tap} className="select-none">
+        <PageHeader title="Settings" sub="Keys stay on this machine, in the local database. Values set in .env take precedence." />
+      </div>
+      <ReleaseControls open={secret.open} />
       {!d ? <div className="flex items-center gap-2 text-fg-2"><Spinner /> Loading</div> : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
           <section className="card p-6">

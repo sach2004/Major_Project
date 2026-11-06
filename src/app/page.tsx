@@ -13,6 +13,9 @@ import { ScheduleSummary, SyncSchedule, UpdateAllButton } from "@/components/Syn
 import { DrawLine, ease, Reveal, RevealWords, Spotlight, Tilt, TypeOut } from "@/components/motion";
 import { Badge, Skeleton } from "@/components/ui";
 import { fmt, LANG_COLORS, timeAgo, useFetch } from "@/lib/client/api";
+import { PHASE_2_FEATURES } from "@/lib/features";
+import { useFeatureLocks, usePhase2 } from "@/lib/client/features";
+import { GitFork, LayoutDashboard, Sparkles } from "lucide-react";
 
 interface RepoRow {
   id: string; name: string; url: string; isLocal: boolean; branch: string | null; status: string; error: string | null;
@@ -21,14 +24,25 @@ interface RepoRow {
   latestJob: any;
 }
 
-const STEPS = [
+const PHASE_1_STEPS = [
+  { t: "Clone and parse", d: "Every file is read and split into classes, functions and imports across 15 languages." },
+  { t: "Resolve dependencies", d: "Imports are linked to the files and packages they point to; calls and inheritance are matched." },
+  { t: "Build the graph", d: "Modules, files and functions become a knowledge graph with every relationship as an edge." },
+  { t: "Explore", d: "Browse the overview, move through the graph and inspect each file’s dependencies." },
+];
+
+const PHASE_2_STEPS = [
   { t: "Clone and parse", d: "Every file is read and split into classes, functions and imports across 15 languages." },
   { t: "Build the graph", d: "Imports, calls and inheritance become edges in a knowledge graph you can explore." },
   { t: "Read the history", d: "Commits reveal hotspots, owners and the files that always change together." },
   { t: "Answer and predict", d: "Questions get cited answers; proposed changes get a blast radius and a risk score." },
 ];
 
+const STEPS = (p2: boolean) => (p2 ? PHASE_2_STEPS : PHASE_1_STEPS);
+
 export default function Home() {
+  const PHASE_2_ENABLED = usePhase2();
+  const featureLocks = useFeatureLocks();
   const repos = useFetch<RepoRow[]>("/api/repos", { interval: (d) => (d?.some((r) => r.running || r.status === "analyzing") ? 2000 : 15000) });
   const sys = useFetch<{ git: boolean; llm: boolean }>("/api/system");
   const hasRepos = !!repos.data?.length;
@@ -60,14 +74,16 @@ export default function Home() {
             </h1>
             <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.7, ease }}
               className="mt-5 max-w-[33rem] text-[17px] leading-relaxed text-fg-2">
-              Point it at a Git repository. It maps files, functions and commits into a knowledge graph, answers questions with cited code, and shows what breaks before you ship.
+              {PHASE_2_ENABLED
+                ? "Point it at a Git repository. It maps files, functions and commits into a knowledge graph, answers questions with cited code, and shows what breaks before you ship."
+                : "Point it at a Git repository. It maps every module, file, class and function into a knowledge graph, so you can see the structure at a glance and trace exactly what depends on what."}
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.7, ease }} className="mt-8 max-w-[36rem]">
               <AddRepo onAdded={repos.reload} />
             </motion.div>
-            {sys.data && (!sys.data.llm || !sys.data.git) && (
+            {sys.data && ((PHASE_2_ENABLED && !sys.data.llm) || !sys.data.git) && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="mt-5 max-w-[36rem] space-y-2">
-                {!sys.data.llm && (
+                {PHASE_2_ENABLED && !sys.data.llm && (
                   <Link href="/settings" className="flex items-center gap-2.5 rounded-xl border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-[13.5px] text-fg hover:border-warn/50">
                     <KeyRound size={15} className="shrink-0 text-warn" />
                     <span>Add a Gemini or OpenAI key to turn on chat, explanations and written docs.</span>
@@ -127,7 +143,7 @@ export default function Home() {
             <DrawLine delay={0.2} />
           </div>
           <ol className="relative grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((s, i) => (
+            {STEPS(PHASE_2_ENABLED).map((s, i) => (
               <motion.li key={s.t} className="relative" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ delay: 0.15 + i * 0.12, duration: 0.6, ease }}>
                 <motion.span initial={{ scale: 0.4 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.12, type: "spring", stiffness: 400, damping: 18 }}
                   className="relative grid h-8 w-8 place-items-center rounded-full border border-line-2 bg-panel font-mono text-[13px] font-medium text-fg">{i + 1}</motion.span>
@@ -140,32 +156,68 @@ export default function Home() {
         </div>
       </section>
 
+      {PHASE_2_ENABLED ? (
       <section id="features" className="mx-auto max-w-[1200px] scroll-mt-20 space-y-24 px-6 py-24">
-        <Feature icon={<MessageSquareText size={18} />} title="Ask questions, get answers with sources"
-          body="Graph traversal and semantic search find the right code first, then the model answers from it. Every answer links back to the exact files and lines it used."
-          visual={<ChatVisual />} />
-        <Feature flip icon={<Radar size={18} />} title="See the blast radius of a change"
-          body="Pick a function or paste a diff. Dependencies are traced three hops out, Git history adds files that usually change together, and the result is scored for risk with the tests you should run."
-          visual={<RiskVisual />} />
-        <Feature icon={<Network size={18} />} title="Explore the architecture, then document it"
-          body="Move from modules to files to individual functions in an interactive graph. Generate an architecture overview, a dependency guide and per-module docs, and export them as Markdown."
+          <Feature icon={<MessageSquareText size={18} />} title="Ask questions, get answers with sources"
+            body="Graph traversal and semantic search find the right code first, then the model answers from it. Every answer links back to the exact files and lines it used."
+            visual={<ChatVisual />} />
+          <Feature flip icon={<Radar size={18} />} title="See the blast radius of a change"
+            body="Pick a function or paste a diff. Dependencies are traced three hops out, Git history adds files that usually change together, and the result is scored for risk with the tests you should run."
+            visual={<RiskVisual />} />
+          <Feature icon={<Network size={18} />} title="Explore the architecture, then document it"
+            body="Move from modules to files to individual functions in an interactive graph. Generate an architecture overview, a dependency guide and per-module docs, and export them as Markdown."
+            visual={<ModulesVisual />} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              { i: <ScanSearch size={17} />, t: "Health report", d: "Circular dependencies, oversized files, hotspots, single-owner code and unused functions." },
+              { i: <GitCommitHorizontal size={17} />, t: "History analytics", d: "Weekly activity, contributors, churn and the full commit log with changed files." },
+              { i: <BookOpenText size={17} />, t: "Markdown export", d: "Every generated document downloads as one Markdown file for your wiki or README." },
+            ].map((x, i) => (
+              <Reveal key={x.t} delay={i * 0.08}>
+                <Spotlight className="card h-full p-5">
+                  <motion.span whileHover={{ rotate: -8, scale: 1.08 }} className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel-2 text-fg">{x.i}</motion.span>
+                  <p className="mt-4 text-[15px] font-semibold text-fg">{x.t}</p>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-fg-2">{x.d}</p>
+                </Spotlight>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+      ) : (
+      <section id="features" className="mx-auto max-w-[1200px] scroll-mt-20 space-y-24 px-6 py-24">
+        <Feature icon={<LayoutDashboard size={18} />} title="See the whole repository at a glance"
+          body="The overview dashboard shows how many files, lines, classes, functions and relationships the project has, which languages it uses, its external packages and a map of its modules."
+          visual={<OverviewVisual />} />
+        <Feature flip icon={<Network size={18} />} title="Explore the architecture as a knowledge graph"
+          body="Move from modules to files to individual functions in an interactive graph. Select any node to see what it contains, what it calls, what it extends and its source code."
           visual={<ModulesVisual />} />
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            { i: <ScanSearch size={17} />, t: "Health report", d: "Circular dependencies, oversized files, hotspots, single-owner code and unused functions." },
-            { i: <GitCommitHorizontal size={17} />, t: "History analytics", d: "Weekly activity, contributors, churn and the full commit log with changed files." },
-            { i: <BookOpenText size={17} />, t: "Markdown export", d: "Every generated document downloads as one Markdown file for your wiki or README." },
-          ].map((x, i) => (
-            <Reveal key={x.t} delay={i * 0.08}>
-              <Spotlight className="card h-full p-5">
-                <motion.span whileHover={{ rotate: -8, scale: 1.08 }} className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel-2 text-fg">{x.i}</motion.span>
-                <p className="mt-4 text-[15px] font-semibold text-fg">{x.t}</p>
-                <p className="mt-1 text-[13.5px] leading-relaxed text-fg-2">{x.d}</p>
-              </Spotlight>
-            </Reveal>
-          ))}
+        <Feature icon={<GitFork size={18} />} title="Trace every file’s dependencies"
+          body="Pick a file to see exactly what it imports, which packages it uses and which files depend on it, with its import graph alongside."
+          visual={<DepsVisual />} />
+        <div>
+          <Reveal>
+            <div className="mb-5 flex items-center gap-3">
+              <h3 className="font-display text-[1.5rem] font-semibold text-fg">Coming in Phase 2</h3>
+              <span className="rounded-full border border-line bg-panel px-2.5 py-0.5 text-[12px] font-medium text-fg-2">Coming soon</span>
+            </div>
+          </Reveal>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(PHASE_2_FEATURES).filter(([k]) => featureLocks[k as keyof typeof featureLocks]).map(([, x], i) => (
+              <Reveal key={x.title} delay={i * 0.06}>
+                <Spotlight className="card h-full p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg border border-line bg-panel-2 text-fg-3"><Sparkles size={16} /></span>
+                    <span className="rounded-md border border-line bg-panel-2 px-1.5 py-px text-[10.5px] font-medium text-fg-3">Phase 2</span>
+                  </div>
+                  <p className="mt-4 text-[15px] font-semibold text-fg">{x.title}</p>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-fg-2">{x.description}</p>
+                </Spotlight>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
+      )}
 
       <section id="updates" className="scroll-mt-20 border-t border-line bg-panel">
         <div className="mx-auto grid max-w-[1200px] gap-12 px-6 py-20 lg:grid-cols-[1fr_1.1fr]">
@@ -277,6 +329,49 @@ function ModulesVisual() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function OverviewVisual() {
+  const stats = [["412", "files"], ["38.6k", "lines"], ["2,140", "symbols"], ["5,906", "links"]] as const;
+  const langs = [["TypeScript", 62, "#3178c6"], ["Python", 24, "#3572a5"], ["Go", 14, "#00a7c7"]] as const;
+  return (
+    <div className="card p-5">
+      <div className="grid grid-cols-4 gap-3">
+        {stats.map(([v, l]) => <div key={l}><p className="num font-display text-[1.45rem] font-semibold leading-none text-fg">{v}</p><p className="mt-1 text-[12px] text-fg-3">{l}</p></div>)}
+      </div>
+      <div className="mt-5 space-y-3 border-t border-line pt-4">
+        {langs.map(([l, pct, c], i) => (
+          <div key={l} className="flex items-center gap-3 text-[13px]">
+            <span className="w-24 text-fg">{l}</span>
+            <Bar pct={pct} color={c} delay={i * 0.08} />
+            <span className="num w-9 text-right text-fg-2">{pct}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DepsVisual() {
+  const imports = ["db/client.ts", "auth/tokens.ts", "lib/logger.ts"];
+  const usedBy = ["http/middleware.ts", "routes/login.ts", "routes/account.ts"];
+  return (
+    <div className="card p-5">
+      <p className="path text-fg">auth/session.ts</p>
+      <div className="mt-4 grid grid-cols-2 gap-5 text-[13px]">
+        {[["Imports", imports], ["Imported by", usedBy]].map(([t, list], k) => (
+          <div key={t as string}>
+            <p className="mb-2 text-[12px] font-medium text-fg-3">{t as string}</p>
+            <ul className="space-y-1.5">
+              {(list as string[]).map((f, i) => (
+                <motion.li key={f} className="path text-fg-2" initial={{ opacity: 0, x: k ? 10 : -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.15 + i * 0.08 }}>{f}</motion.li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

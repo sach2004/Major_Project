@@ -9,6 +9,7 @@ import { Markdown } from "@/components/Markdown";
 import { GraphCanvas } from "@/components/GraphCanvas";
 import { Badge, Dot, Meter, Skeleton } from "@/components/ui";
 import { colorFor, LANG_COLORS, timeAgo, useFetch } from "@/lib/client/api";
+import { useFeature } from "@/lib/client/features";
 
 function Section({ title, action, children, className = "" }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
@@ -27,9 +28,11 @@ const More = ({ href, children }: { href: string; children: React.ReactNode }) =
 );
 
 export default function Overview() {
+  const explainOn = useFeature("explain");
+  const insightsOn = useFeature("insights");
   const { id } = useParams<{ id: string }>();
   const { repo } = useRepo();
-  const ins = useFetch<any>(`/api/repos/${id}/insights`);
+  const ins = useFetch<any>(insightsOn ? `/api/repos/${id}/insights` : null);
   const mod = useFetch<any>(`/api/repos/${id}/graph?level=module`);
   const jobs = useFetch<any>(`/api/repos/${id}/jobs`);
   if (!repo?.stats) return null;
@@ -65,12 +68,15 @@ export default function Overview() {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
-        <Section title="Summary" className="lg:col-span-2">
+        {explainOn && (
+        <Section title="Summary" className={insightsOn ? "lg:col-span-2" : "lg:col-span-3"}>
           {repo.summary ? <Markdown>{repo.summary}</Markdown> : (
             <p className="text-[14px] text-fg-2">No AI summary yet. Add a Gemini or OpenAI key in <Link className="text-info underline underline-offset-2" href="/settings">Settings</Link>, then click Sync now.</p>
           )}
         </Section>
+        )}
 
+        {insightsOn && (
         <Section title="Architecture health" action={<More href={`/repos/${id}/insights`}>Report</More>}>
           {health == null ? <Skeleton className="h-36" /> : (
             <>
@@ -90,8 +96,9 @@ export default function Overview() {
             </>
           )}
         </Section>
+        )}
 
-        <Section title="Module map" className="lg:col-span-2" action={<More href={`/repos/${id}/explorer`}>Open explorer</More>}>
+        <Section title="Module map" className="lg:col-span-2" action={<span className="flex items-center gap-4"><More href={`/repos/${id}/dependencies`}>File dependencies</More><More href={`/repos/${id}/explorer`}>Open explorer</More></span>}>
           <div className="inset overflow-hidden">
             {mod.data ? (
               mod.data.nodes.length ? <GraphCanvas nodes={mod.data.nodes} links={mod.data.links} height={330} colorOf={(n) => colorFor(n.group)} showLabels="always" /> : <p className="py-16 text-center text-[14px] text-fg-2">No code modules detected.</p>

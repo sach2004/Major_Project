@@ -3,25 +3,32 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpenText, ChevronDown, ChevronRight, GitBranch, History, LayoutDashboard, MessageSquareText, Network, Radar, RefreshCw, ScanSearch, Settings, Trash2 } from "lucide-react";
+import { BookOpenText, ChevronDown, ChevronRight, GitBranch, GitFork, History, LayoutDashboard, MessageSquareText, Network, Radar, RefreshCw, ScanSearch, Settings, Trash2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { JobProgress } from "@/components/JobProgress";
 import { RepoCtx, type RepoDetail } from "@/components/RepoContext";
 import { Badge, Spinner, Toggle } from "@/components/ui";
 import { api, clearFetchCache, timeAgo, useFetch } from "@/lib/client/api";
+import { type Phase2Feature } from "@/lib/features";
+import { useFeatureLocks } from "@/lib/client/features";
+import { ComingSoon, PhaseBadge } from "@/components/ComingSoon";
 
-const NAV = [
+const NAV: { href: string; label: string; icon: typeof LayoutDashboard; phase2?: Phase2Feature }[] = [
   { href: "", label: "Overview", icon: LayoutDashboard },
   { href: "/explorer", label: "Architecture", icon: Network },
-  { href: "/chat", label: "Ask the code", icon: MessageSquareText },
-  { href: "/impact", label: "Change impact", icon: Radar },
-  { href: "/history", label: "History", icon: History },
-  { href: "/docs", label: "Documentation", icon: BookOpenText },
-  { href: "/insights", label: "Health", icon: ScanSearch },
+  { href: "/dependencies", label: "Dependencies", icon: GitFork },
+  { href: "/chat", label: "Ask the code", icon: MessageSquareText, phase2: "chat" },
+  { href: "/impact", label: "Change impact", icon: Radar, phase2: "impact" },
+  { href: "/history", label: "History", icon: History, phase2: "history" },
+  { href: "/docs", label: "Documentation", icon: BookOpenText, phase2: "docs" },
+  { href: "/insights", label: "Health", icon: ScanSearch, phase2: "insights" },
 ];
 
+
 export default function RepoLayout({ children }: { children: React.ReactNode }) {
+  const locks = useFeatureLocks();
+  const locked = (n: (typeof NAV)[number]) => !!n.phase2 && locks[n.phase2];
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const router = useRouter();
@@ -68,7 +75,8 @@ export default function RepoLayout({ children }: { children: React.ReactNode }) 
 
   const ready = !!repo?.lastAnalyzedAt;
   const current = NAV.find((n) => (n.href ? pathname.startsWith(base + n.href) : pathname === base)) ?? NAV[0];
-  const fullBleed = current.href === "/explorer";
+  const blocked = locked(current);
+  const fullBleed = current.href === "/explorer" && !blocked;
 
   return (
     <RepoCtx.Provider value={{ repo: repo ?? null, reload: q.reload, ready }}>
@@ -87,6 +95,15 @@ export default function RepoLayout({ children }: { children: React.ReactNode }) 
             {NAV.map((n) => {
               const active = n === current;
               const Icon = n.icon;
+              if (locked(n)) {
+                return (
+                  <span key={n.label} aria-disabled="true" title="Coming in Phase 2" className="relative flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] text-fg-3">
+                    <Icon size={16} className="relative opacity-60" />
+                    <span className="relative opacity-70">{n.label}</span>
+                    <PhaseBadge className="relative ml-auto" />
+                  </span>
+                );
+              }
               return (
                 <Link key={n.label} href={base + n.href} className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] transition-colors ${active ? "font-medium text-fg" : "text-fg-2 hover:bg-panel-2 hover:text-fg"}`}>
                   {active && <motion.span layoutId="nav-active" className="absolute inset-0 rounded-lg bg-panel-2" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
@@ -140,7 +157,9 @@ export default function RepoLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 md:hidden">
-            {NAV.map((n) => <Link key={n.label} href={base + n.href} className={`chip shrink-0 ${n === current ? "border-fg text-fg" : ""}`}>{n.label}</Link>)}
+            {NAV.map((n) => locked(n)
+              ? <span key={n.label} aria-disabled="true" className="chip shrink-0 cursor-not-allowed opacity-60">{n.label} <PhaseBadge /></span>
+              : <Link key={n.label} href={base + n.href} className={`chip shrink-0 ${n === current ? "border-fg text-fg" : ""}`}>{n.label}</Link>)}
           </div>
 
           {repo?.running && repo.latestJob && ready && (
@@ -154,6 +173,8 @@ export default function RepoLayout({ children }: { children: React.ReactNode }) 
               <div className="flex items-center gap-2 text-fg-2"><Spinner /> Loading repository</div>
             ) : !ready ? (
               <FirstRun repo={repo} onRetry={() => trigger("analyze")} />
+            ) : blocked ? (
+              <ComingSoon feature={current.phase2!} backHref={base} />
             ) : (
               <div key={version} className={fullBleed ? "h-full" : ""}>{children}</div>
             )}

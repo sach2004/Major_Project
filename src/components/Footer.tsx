@@ -4,17 +4,19 @@ import { motion } from "framer-motion";
 import { ArrowUp } from "lucide-react";
 import { LogoMark } from "./Logo";
 import { ScheduleSummary } from "./SyncControls";
+import { usePhase2 } from "@/lib/client/features";
 
 const WORD = "Software Archaeologist";
 
 export function Footer() {
+  const PHASE_2_ENABLED = usePhase2();
   return (
     <footer className="relative overflow-hidden border-t border-line bg-panel">
       <div className="mx-auto max-w-[1200px] px-6 pt-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-2.5"><LogoMark size={26} /><span className="font-display text-[16px] font-semibold text-fg">Software Archaeologist</span></div>
-            <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-fg-2">Knowledge graphs, cited answers and change impact for any Git repository. Runs on your machine; your code and keys never leave it.</p>
+            <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-fg-2">{PHASE_2_ENABLED ? "Knowledge graphs, cited answers and change impact for any Git repository." : "Repository overview, an interactive knowledge graph and file dependencies for any Git repository."} Runs on your machine; your code and keys never leave it.</p>
             <div className="mt-5"><ScheduleSummary /></div>
           </div>
           <div>

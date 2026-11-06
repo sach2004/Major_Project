@@ -9,10 +9,12 @@ import { FileTree, type TreeNode } from "@/components/FileTree";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { Segmented, Skeleton, Toggle } from "@/components/ui";
 import { colorFor, LANG_COLORS, useFetch } from "@/lib/client/api";
+import { useFeature } from "@/lib/client/features";
 
 type Level = "module" | "file" | "entity";
 
 export default function Explorer() {
+  const historyOn = useFeature("history");
   const { id } = useParams<{ id: string }>();
   const [level, setLevel] = useState<Level>("file");
   const [focus, setFocus] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export default function Explorer() {
           )}
           <div className="ml-auto flex items-center gap-4">
             {level !== "module" && <Segmented value={colorBy} onChange={setColorBy} options={[{ value: "module", label: "By module" }, { value: "language", label: "By language" }]} />}
-            <Toggle checked={cochange} onChange={setCochange} label={<span className="text-[13px]">Co-change links</span>} />
+            {historyOn && <Toggle checked={cochange} onChange={setCochange} label={<span className="text-[13px]">Co-change links</span>} />}
           </div>
         </div>
         <div className="grid-bg relative min-h-0 flex-1">

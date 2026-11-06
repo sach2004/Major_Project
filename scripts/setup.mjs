@@ -25,7 +25,7 @@ if (!/^DATABASE_URL=/m.test(readFileSync(envPath, "utf8"))) {
 mkdirSync(path.join(root, ".data", "repos"), { recursive: true });
 
 try {
-  if (!existsSync(path.join(root, "node_modules", ".prisma", "client", "index.js")) || !quiet) {
+  if (true) {
     log("generating Prisma client");
     run("npx prisma generate");
   }

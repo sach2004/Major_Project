@@ -1,6 +1,7 @@
 "use client";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useFeature } from "@/lib/client/features";
 
 type N = { id: string; x: number; y: number; label: string; depth: number | null };
 
@@ -27,6 +28,7 @@ const EDGES: [string, string][] = [
 const pos = Object.fromEntries(NODES.map((n) => [n.id, n]));
 
 export function HeroGraph() {
+  const PHASE_2_ENABLED = useFeature("impact");
   const reduce = useReducedMotion();
   const [phase, setPhase] = useState(0);
 
@@ -57,10 +59,10 @@ export function HeroGraph() {
         <span className="h-2.5 w-2.5 rounded-full bg-line-2" />
         <span className="h-2.5 w-2.5 rounded-full bg-line-2" />
         <span className="ml-3 font-mono text-[11.5px] text-fg-3">acme/web-platform</span>
-        <span className="ml-auto text-[11.5px] text-fg-3">Change impact</span>
+        <span className="ml-auto text-[11.5px] text-fg-3">{PHASE_2_ENABLED ? "Change impact" : "Dependency graph"}</span>
       </div>
       <div className="grid-bg relative">
-        <svg viewBox="0 0 580 390" className="block h-auto w-full" role="img" aria-label="Knowledge graph highlighting the files affected by changing auth/session.ts">
+        <svg viewBox="0 0 580 390" className="block h-auto w-full" role="img" aria-label="Knowledge graph highlighting the files that depend on auth/session.ts">
           {EDGES.map(([a, b], i) => {
             const A = pos[a], B = pos[b];
             const on = edgeLit(a, b);
@@ -102,15 +104,31 @@ export function HeroGraph() {
           transition={{ duration: 0.35 }}
         >
           <p className="font-mono text-[11.5px] text-fg-3">auth/session.ts</p>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-display text-[1.75rem] font-semibold leading-none text-accent">64</span>
-            <span className="text-fg-2">high risk</span>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-2.5 text-fg-2">
-            <div><p className="num font-semibold text-fg">7</p><p className="text-[11px] text-fg-3">files</p></div>
-            <div><p className="num font-semibold text-fg">2</p><p className="text-[11px] text-fg-3">hops</p></div>
-            <div><p className="num font-semibold text-fg">1</p><p className="text-[11px] text-fg-3">test</p></div>
-          </div>
+          {PHASE_2_ENABLED ? (
+            <>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="font-display text-[1.75rem] font-semibold leading-none text-accent">64</span>
+                <span className="text-fg-2">high risk</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-2.5 text-fg-2">
+                <div><p className="num font-semibold text-fg">7</p><p className="text-[11px] text-fg-3">files</p></div>
+                <div><p className="num font-semibold text-fg">2</p><p className="text-[11px] text-fg-3">hops</p></div>
+                <div><p className="num font-semibold text-fg">1</p><p className="text-[11px] text-fg-3">test</p></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="font-display text-[1.75rem] font-semibold leading-none text-accent">7</span>
+                <span className="text-fg-2">files depend on it</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-2.5 text-fg-2">
+                <div><p className="num font-semibold text-fg">3</p><p className="text-[11px] text-fg-3">direct</p></div>
+                <div><p className="num font-semibold text-fg">2</p><p className="text-[11px] text-fg-3">levels</p></div>
+                <div><p className="num font-semibold text-fg">1</p><p className="text-[11px] text-fg-3">import</p></div>
+              </div>
+            </>
+          )}
         </motion.div>
       </div>
     </div>

@@ -6,13 +6,19 @@ import { api, timeAgo, useFetch } from "@/lib/client/api";
 import { Markdown } from "./Markdown";
 import { CodeBlock } from "./CodeBlock";
 import { Badge, ErrorNote, Skeleton, Spinner } from "./ui";
+import { useFeature } from "@/lib/client/features";
 
-const REL_LABELS: [string, string][] = [
+const ALL_REL_LABELS: [string, string][] = [
   ["containedIn", "Defined in"], ["contains", "Contains"], ["calls", "Calls"], ["calledBy", "Called by"],
   ["extends", "Extends / implements"], ["extendedBy", "Extended by"], ["imports", "Imports"], ["importedBy", "Imported by"], ["coChanged", "Changes together with"],
 ];
+// "Changes together with" comes from Git history, which is a Phase 2 feature.
 
 export function NodeDetail({ repoId, nodeKey, onSelect, onFocus, onClose }: { repoId: string; nodeKey: string; onSelect: (key: string) => void; onFocus?: (key: string) => void; onClose: () => void }) {
+  const historyOn = useFeature("history");
+  const explainOn = useFeature("explain");
+  const REL_LABELS = historyOn ? ALL_REL_LABELS : ALL_REL_LABELS.filter(([k]) => k !== "coChanged");
+  const TABS: readonly ("about" | "source" | "history")[] = historyOn ? ["about", "source", "history"] : ["about", "source"];
   const q = useFetch<any>(`/api/repos/${repoId}/node?key=${encodeURIComponent(nodeKey)}`);
   const [explain, setExplain] = useState<{ busy?: boolean; text?: string; error?: string }>({});
   const [tab, setTab] = useState<"about" | "source" | "history">("about");
@@ -47,12 +53,12 @@ export function NodeDetail({ repoId, nodeKey, onSelect, onFocus, onClose }: { re
       {d && (
         <>
           {d.kind !== "package" && (
-            <div className="grid grid-cols-4 gap-2 border-b border-line px-4 py-3 text-[12px]">
-              <M v={d.node.loc} l="lines" /><M v={d.node.fanIn} l="fan-in" /><M v={d.node.fanOut} l="fan-out" /><M v={d.node.commitCount ?? 0} l="commits" />
+            <div className={`grid ${historyOn ? "grid-cols-4" : "grid-cols-3"} gap-2 border-b border-line px-4 py-3 text-[12px]`}>
+              <M v={d.node.loc} l="lines" /><M v={d.node.fanIn} l="fan-in" /><M v={d.node.fanOut} l="fan-out" />{historyOn && <M v={d.node.commitCount ?? 0} l="commits" />}
             </div>
           )}
           <div className="flex items-center gap-1 px-3 pt-3">
-            {(["about", "source", "history"] as const).filter((t) => d.kind !== "package" || t === "about").map((t) => (
+            {TABS.filter((t) => d.kind !== "package" || t === "about").map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`rounded-md px-2.5 py-1 text-[13px] capitalize ${tab === t ? "bg-panel-2 text-fg" : "text-fg-2 hover:text-fg"}`}>{t}</button>
             ))}
             {onFocus && <button className="btn btn-ghost btn-sm ml-auto" onClick={() => onFocus(nodeKey)} title="Show only this node's neighborhood"><Crosshair size={13} /> Neighborhood</button>}
@@ -60,7 +66,7 @@ export function NodeDetail({ repoId, nodeKey, onSelect, onFocus, onClose }: { re
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {tab === "about" && (
               <div className="space-y-5">
-                {d.kind !== "package" && (
+                {explainOn && d.kind !== "package" && (
                   <div>
                     {summary ? (
                       <div className="inset p-3.5">
@@ -87,7 +93,7 @@ export function NodeDetail({ repoId, nodeKey, onSelect, onFocus, onClose }: { re
               </div>
             )}
             {tab === "source" && (d.source ? <CodeBlock code={d.source.text} language={d.node.language} startLine={d.source.startLine} maxHeight={640} /> : <p className="text-[13.5px] text-fg-2">Source not available on disk.</p>)}
-            {tab === "history" && (
+            {historyOn && tab === "history" && (
               <ul className="space-y-2.5">
                 {d.commits.map((c: any) => (
                   <li key={c.sha} className="flex gap-2.5 text-[13px]">
